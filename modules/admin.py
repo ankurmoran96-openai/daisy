@@ -5,6 +5,9 @@ from utils.admin_cache import check_admin, add_admin, remove_admin
 import asyncio
 
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -19,6 +22,9 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -33,6 +39,9 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
          await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
          return
@@ -48,6 +57,9 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
          await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
          return
@@ -68,6 +80,9 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -83,6 +98,9 @@ async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def pin_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -97,6 +115,9 @@ async def pin_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def unpin_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -111,6 +132,9 @@ async def unpin_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def del_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -125,6 +149,9 @@ async def del_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def lock_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         return
     try:
@@ -135,6 +162,9 @@ async def lock_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def unlock_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         return
     try:
@@ -150,6 +180,9 @@ async def unlock_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def set_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     chat = update.effective_chat
     user_id = update.effective_user.id
     try:
@@ -195,6 +228,9 @@ async def set_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"<b>🌟 Promoted <a href='tg://user?id={target_id}'>{reply.from_user.first_name}</a> with tag <code>{custom_title[:16]}</code>!</b>", parse_mode=ParseMode.HTML)
 
 async def del_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     chat = update.effective_chat
     user_id = update.effective_user.id
     try:
@@ -215,6 +251,9 @@ async def del_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def set_gtitle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -229,6 +268,9 @@ async def set_gtitle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def set_gdesc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -240,6 +282,9 @@ async def set_gdesc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 async def export_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
@@ -251,6 +296,9 @@ async def export_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def purge_msgs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Purge a specified number of messages (up to 50 for safety)."""
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
