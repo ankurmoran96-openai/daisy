@@ -38,17 +38,16 @@ def get_help_keyboard():
         [InlineKeyboardButton("🔙 BACK", callback_data="start_menu")]
     ])
 
-START_CAPTION = (
-    "<b>🌸 Welcome to Daisy!</b>\n\n"
-    "<b>Powered by Advanced GPT-4o AI 🧠</b>\n\n"
-    "<blockquote>"
-    "I am a powerful, fully-featured group management bot. "
-    "I can moderate your group, play interactive games with users, and hold intelligent conversations! "
-    "Just mention me or reply to me to start chatting."
-    "</blockquote>\n\n"
-    "──────────────\n"
-    "<i>Click the HELP button below to see everything I can do!</i>"
-)
+def get_start_caption(username):
+    return (
+        f"<b>Heyy {username} 👋🏻, Daisy here!!!</b>\n"
+        f"<b>Your group assistant and yapper 🫶🏻</b>\n\n"
+        f"<b>What I can do ?</b>\n"
+        f"I am a Group assistant along with an AI Chatbot made to add in groups and manage the group.\n\n"
+        f"But I'm not just a boring mod—I also come packed with fun mini-games, an advanced GPT-4o brain, and the ability to hold intelligent, sassy conversations with your members! 🌸\n\n"
+        f"Use /help to know more.\n\n"
+        f"<i>🎊 Enjoy your time, Hope ur day spents well , You can chat w me tho, like how you text your bestie!</i>"
+    )
 
 HELP_CAPTION = (
     "<b>🌸 Daisy's Command Center</b>\n"
@@ -83,17 +82,20 @@ HELP_CAPTION = (
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start command handler."""
+    user_name = update.effective_user.first_name
+    caption = get_start_caption(user_name)
+    
     if os.path.exists(BANNER_PATH):
         with open(BANNER_PATH, 'rb') as photo:
             await update.message.reply_photo(
                 photo=photo,
-                caption=START_CAPTION,
+                caption=caption,
                 parse_mode=ParseMode.HTML,
                 reply_markup=get_start_keyboard()
             )
     else:
         await update.message.reply_text(
-            text=START_CAPTION,
+            text=caption,
             parse_mode=ParseMode.HTML,
             reply_markup=get_start_keyboard()
         )
@@ -120,15 +122,17 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
     elif query.data == "start_menu":
+        user_name = query.from_user.first_name
+        caption = get_start_caption(user_name)
         try:
             await query.edit_message_caption(
-                caption=START_CAPTION,
+                caption=caption,
                 parse_mode=ParseMode.HTML,
                 reply_markup=get_start_keyboard()
             )
         except Exception:
              await query.edit_message_text(
-                text=START_CAPTION,
+                text=caption,
                 parse_mode=ParseMode.HTML,
                 reply_markup=get_start_keyboard()
             )
