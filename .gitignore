@@ -1,0 +1,22 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# API keys and config
+config.py
+
+# Database
+*.db
+*.sqlite3
+database/daisy.db
+data/admins.json
+
+# Cache
+__pycache__/
+*.py[cod]
+*$py.class
