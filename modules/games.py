@@ -64,21 +64,7 @@ async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE): await p
 async def cmd_darts(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'darts')
 
 async def cmd_mcq(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    kb = [
-        [InlineKeyboardButton("BIO", callback_data="mcqsubj_BIO"), InlineKeyboardButton("CHEM", callback_data="mcqsubj_CHEM")],
-        [InlineKeyboardButton("PHYSICS", callback_data="mcqsubj_PHYSICS"), InlineKeyboardButton("AI/ML CODING", callback_data="mcqsubj_AIML")],
-        [InlineKeyboardButton("PYTHON", callback_data="mcqsubj_PYTHON"), InlineKeyboardButton("C++", callback_data="mcqsubj_CPP"), InlineKeyboardButton("C", callback_data="mcqsubj_C")]
-    ]
-    await update.message.reply_text(
-        "<blockquote><b>📚 MCQ Game</b>\nSelect a subject:</blockquote>",
-        reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML
-    )
-
-async def mcq_subj_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    subj = query.data.split('_')[1]
-    await query.answer()
-    await prompt_mode(update, context, 'mcq', extra=subj, is_query=True)
+    await route_game(update, context, 'mcq', 'ai', '')
 
 async def prompt_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, game: str, extra: str = "", is_query: bool = False):
     kb = [
@@ -381,6 +367,9 @@ async def guess_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- MCQ Game ---
 async def start_mcq(user, chat_id, context, subject, query=None):
+    if not subject:
+        subject = random.choice(["BIO", "CHEM", "PHYSICS", "AI/ML CODING", "PYTHON", "C++", "C"])
+
     if query: await query.edit_message_text(f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
     else: await context.bot.send_message(chat_id, f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
 
@@ -395,6 +384,8 @@ async def start_mcq(user, chat_id, context, subject, query=None):
             correct_option_id=q_data['answer'],
             is_anonymous=False
         )
+        kb = [[InlineKeyboardButton("🤖 Play Again", callback_data="gmode_mcq_ai_")]]
+        await context.bot.send_message(chat_id, "<blockquote><b>Play another MCQ?</b></blockquote>", reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
     except Exception as e:
         await context.bot.send_message(chat_id, "⚠️ Error sending MCQ Poll. Try again.")
 
@@ -408,7 +399,6 @@ handlers = [
     CommandHandler('darts', cmd_darts),
     CommandHandler('mcq', cmd_mcq),
     CommandHandler('guess', guess_word),
-    CallbackQueryHandler(mcq_subj_callback, pattern='^mcqsubj_'),
     CallbackQueryHandler(gmode_callback, pattern='^gmode_'),
     CallbackQueryHandler(joinlobby_callback, pattern='^joinlobby_'),
     CallbackQueryHandler(rpsai_callback, pattern='^rpsai_'),
