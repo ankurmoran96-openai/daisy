@@ -40,53 +40,41 @@ def get_help_keyboard():
 
 def get_start_caption(username):
     return (
-        f"<b>Heyy {username} 👋🏻, Daisy here!!!</b>\n"
-        f"<b>Your ultimate group assistant and yapper 🫶🏻</b>\n\n"
-        f"<b>What I can do?</b>\n"
-        f"I am a highly advanced Group Assistant and AI Chatbot designed to seamlessly manage and elevate your Telegram communities. \n\n"
-        f"<b>✨ Advanced Moderation</b>\n"
-        f"Say goodbye to manual spam control! I offer an extensive suite of administrative tools—from muting and banning to mass-purging messages and managing local bot admins. Your group's security is my top priority.\n\n"
+        f"<b>Hello {username}, I am Daisy! 🌸</b>\n"
+        f"<b>Your professional group assistant and intelligent companion.</b>\n\n"
+        f"<b>✨ What can I do?</b>\n"
+        f"I am designed to seamlessly manage and elevate your Telegram communities with advanced tools and state-of-the-art AI.\n\n"
+        f"<b>🛡️ Advanced Moderation</b>\n"
+        f"Keep your group safe with my extensive suite of moderation commands, from muting and banning to managing bot administrators.\n\n"
         f"<b>🧠 Intelligent AI (GPT-4o)</b>\n"
-        f"I'm not just a static script. Powered by state-of-the-art AI, I can hold dynamic conversations, remember our past chats, and provide intelligent answers to your members' questions. Just mention me in the chat!\n\n"
-        f"<b>🎮 Engaging Mini-Games</b>\n"
-        f"Keep your community active and entertained! I host a variety of interactive games including Rock-Paper-Scissors, Word Scrambles, Casino Slots, Darts, and even Multiplayer Tic-Tac-Toe. \n\n"
-        f"<b>🛠 Seamless Integration</b>\n"
-        f"Adding me to your group takes seconds. Once I have admin rights, I silently work in the background, keeping things orderly and fun without being intrusive.\n\n"
-        f"Use the <b>HELP</b> button below to see my full command list and discover all the ways I can help your community thrive.\n\n"
-        f"<i>🎊 Enjoy your time, Hope your day is spent well. You can chat with me here in DMs too, just like how you text your bestie!</i>"
+        f"Engage in dynamic conversations! I remember context and provide smart answers. Just mention me or reply to my messages.\n\n"
+        f"<b>🎮 Interactive Mini-Games</b>\n"
+        f"Entertain your members with games like Rock-Paper-Scissors, Casino Slots, Darts, and Tic-Tac-Toe.\n\n"
+        f"<b>⚙️ Easy Integration</b>\n"
+        f"Grant me admin rights and I will silently keep your group orderly in the background.\n\n"
+        f"<i>Click the <b>HELP</b> button below to see all my features, or DM me to chat privately!</i>"
     )
 
-HELP_CAPTION = (
-    "<b>🌸 Daisy's Command Center 🌸</b>\n"
-    "<i>Here is everything I can do for you!</i>\n"
-    "━━━━━━━━━━━━━━━━━━━━\n\n"
-    "<b>👮‍♂️ Admin Commands (16)</b>\n"
-    "<code>/ban</code> - Remove a user permanently\n"
-    "<code>/unban</code> - Forgive and unban a user\n"
-    "<code>/kick</code> - Remove a user (can rejoin)\n"
-    "<code>/mute</code> - Restrict texting rights\n"
-    "<code>/unmute</code> - Restore texting rights\n"
-    "<code>/pin</code> - Highlight a message\n"
-    "<code>/unpin</code> - Remove highlighted messages\n"
-    "<code>/del</code> - Delete a specific message\n"
-    "<code>/purge [count]</code> - Mass sweep messages\n"
-    "<code>/lock</code> - Lockdown the entire chat\n"
-    "<code>/unlock</code> - Lift the lockdown\n"
-    "<code>/setgtitle</code> - Update group name\n"
-    "<code>/setgdesc</code> - Update group bio\n"
-    "<code>/exportlink</code> - Generate a fresh invite\n"
-    "<code>/setadmin [tag]</code> - Assign a Bot Admin\n"
-    "<code>/deladmin</code> - Revoke Bot Admin\n\n"
-    "<b>🎮 Mini Games (6)</b>\n"
-    "<code>/rps</code> - Interactive Rock-Paper-Scissors\n"
-    "<code>/wordguess</code> - Unscramble the word\n"
-    "<code>/dice</code> - Roll the lucky dice 🎲\n"
-    "<code>/slots</code> - Hit the Casino jackpot 🎰\n"
-    "<code>/darts</code> - Aim for the bullseye 🎯\n"
-    "<code>/tictactoe</code> - Multiplayer Showdown ❌⭕️\n\n"
-    "<b>🤖 AI Chat Engine</b>\n"
-    "Mention me <code>@daisyslaysbot</code> in a group, or just reply to me to start chatting!"
-)
+def get_help_caption(username):
+    return (
+        f"<b>🌸 Daisy's Command Center 🌸</b>\n"
+        f"<i>Hello {username}, here is my complete command list!</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"<b>👮‍♂️ Admin Commands</b>\n"
+        f"<code>/ban</code> | <code>/unban</code> | <code>/kick</code> - Manage members\n"
+        f"<code>/mute</code> | <code>/unmute</code> - Manage texting rights\n"
+        f"<code>/pin</code> | <code>/unpin</code> | <code>/del</code> - Manage messages\n"
+        f"<code>/purge [count]</code> - Mass sweep messages\n"
+        f"<code>/lock</code> | <code>/unlock</code> - Lockdown chat\n"
+        f"<code>/setgtitle</code> | <code>/setgdesc</code> - Manage group info\n"
+        f"<code>/exportlink</code> - Generate invite link\n"
+        f"<code>/setadmin [tag]</code> | <code>/deladmin</code> - Manage Bot Admins\n\n"
+        f"<b>🎮 Mini Games</b>\n"
+        f"<code>/rps</code>, <code>/wordguess</code>, <code>/dice</code> 🎲\n"
+        f"<code>/slots</code> 🎰, <code>/darts</code> 🎯, <code>/tictactoe</code> ❌⭕️\n\n"
+        f"<b>🤖 AI Chat Engine</b>\n"
+        f"Mention <code>@daisyslaysbot</code> or reply to me to start chatting!"
+    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start command handler."""
@@ -114,17 +102,19 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == "help_menu":
+        user_name = query.from_user.first_name
+        help_text = get_help_caption(user_name)
         try:
             # We must edit the caption since the original message is a photo
             await query.edit_message_caption(
-                caption=HELP_CAPTION,
+                caption=help_text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=get_help_keyboard()
             )
         except Exception:
             # Fallback if no photo
             await query.edit_message_text(
-                text=HELP_CAPTION,
+                text=help_text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=get_help_keyboard()
             )

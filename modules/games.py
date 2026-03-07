@@ -7,25 +7,34 @@ import asyncio
 
 # --- Rock Paper Scissors (Interactive) ---
 async def play_rps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     keyboard = [
         [
-            InlineKeyboardButton("🪨 Rock", callback_data="rps_rock"),
-            InlineKeyboardButton("📄 Paper", callback_data="rps_paper"),
-            InlineKeyboardButton("✂️ Scissors", callback_data="rps_scissors")
+            InlineKeyboardButton("🪨 Rock", callback_data=f"rps_rock_{user_id}"),
+            InlineKeyboardButton("📄 Paper", callback_data=f"rps_paper_{user_id}"),
+            InlineKeyboardButton("✂️ Scissors", callback_data=f"rps_scissors_{user_id}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "<b>🎮 Rock, Paper, Scissors!</b>\nChoose your weapon:",
+        "<blockquote><b>🎮 Rock, Paper, Scissors!</b>\nChoose your weapon:</blockquote>",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
 
 async def rps_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    parts = query.data.split('_')
+    user_choice = parts[1]
+    original_user_id = int(parts[2])
+    
+    if query.from_user.id != original_user_id:
+        await query.answer("This is not your game!", show_alert=True)
+        return
+        
     await query.answer()
     
-    user_choice = query.data.split('_')[1]
     bot_choice = random.choice(['rock', 'paper', 'scissors'])
     
     emojis = {'rock': '🪨', 'paper': '📄', 'scissors': '✂️'}
@@ -42,10 +51,10 @@ async def rps_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update_game_stat(query.from_user.id, 'rps', 'loss')
         
     await query.edit_message_text(
-        f"<b>🎮 Rock, Paper, Scissors!</b>\n\n"
-        f"<b>You:</b> {emojis[user_choice]} {user_choice.title()}\n"
-        f"<b>Daisy:</b> {emojis[bot_choice]} {bot_choice.title()}\n\n"
-        f"<b>Result:</b> {result}",
+        f"<blockquote><b>🎮 Rock, Paper, Scissors!</b>\n\n"
+        f"<b>You:</b> {emojis[user_choice]} <code>{user_choice.title()}</code>\n"
+        f"<b>Daisy:</b> {emojis[bot_choice]} <code>{bot_choice.title()}</code>\n\n"
+        f"<b>Result:</b> {result}</blockquote>",
         parse_mode=ParseMode.HTML
     )
 
@@ -58,30 +67,30 @@ async def play_wordguess(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.chat_data['word'] = word
     
     text = (
-        "<b>🧠 Word Guess Challenge!</b>\n\n"
+        "<blockquote><b>🧠 Word Guess Challenge!</b>\n\n"
         f"Unscramble this word: <code>{scrambled.upper()}</code>\n\n"
-        "<i>Reply with <code>/guess [your_answer]</code> to win!</i>"
+        "<i>Reply with <code>/guess [your_answer]</code> to win!</i></blockquote>"
     )
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 async def guess_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'word' not in context.chat_data:
-        await update.message.reply_text("<b>No game active. Start one with /wordguess</b>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("<blockquote><b>No game active. Start one with /wordguess</b></blockquote>", parse_mode=ParseMode.HTML)
         return
         
     if not context.args:
-         await update.message.reply_text("<b>Usage:</b> <code>/guess [your_answer]</code>", parse_mode=ParseMode.HTML)
+         await update.message.reply_text("<blockquote><b>Usage:</b> <code>/guess [your_answer]</code></blockquote>", parse_mode=ParseMode.HTML)
          return
          
     guess = context.args[0].lower()
     correct_word = context.chat_data['word']
     
     if guess == correct_word:
-        await update.message.reply_text(f"<b>🎉 Correct!</b> The word was <code>{correct_word.upper()}</code>.", parse_mode=ParseMode.HTML)
+        await update.message.reply_text(f"<blockquote><b>🎉 Correct!</b> The word was <code>{correct_word.upper()}</code>.</blockquote>", parse_mode=ParseMode.HTML)
         await update_game_stat(update.effective_user.id, 'word', 'win')
         del context.chat_data['word']
     else:
-        await update.message.reply_text("<b>❌ Incorrect! Try again.</b>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("<blockquote><b>❌ Incorrect! Try again.</b></blockquote>", parse_mode=ParseMode.HTML)
 
 # --- Dice Roll (Animated) ---
 async def play_dice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -89,7 +98,7 @@ async def play_dice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(4)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"<b>🎲 You rolled a {msg.dice.value}!</b>",
+        text=f"<blockquote><b>🎲 You rolled a <code>{msg.dice.value}</code>!</b></blockquote>",
         reply_to_message_id=msg.message_id,
         parse_mode=ParseMode.HTML
     )
@@ -101,9 +110,9 @@ async def play_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     val = msg.dice.value
     # Jackpot combinations in Telegram slots
     if val in [1, 22, 43, 64]:
-        text = "<b>🎰 JACKPOT! You won! 🎉</b>"
+        text = "<blockquote><b>🎰 JACKPOT! You won! 🎉</b></blockquote>"
     else:
-        text = "<b>🎰 Better luck next time!</b>"
+        text = "<blockquote><b>🎰 Better luck next time!</b></blockquote>"
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=text,
@@ -117,11 +126,11 @@ async def play_darts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(4)
     val = msg.dice.value
     if val == 6:
-        text = "<b>🎯 Bullseye! Perfect shot! 🏆</b>"
+        text = "<blockquote><b>🎯 Bullseye! Perfect shot! 🏆</b></blockquote>"
     elif val >= 4:
-        text = "<b>🎯 Good shot!</b>"
+        text = "<blockquote><b>🎯 Good shot!</b></blockquote>"
     else:
-        text = "<b>🎯 Missed the center. Try again!</b>"
+        text = "<blockquote><b>🎯 Missed the center. Try again!</b></blockquote>"
         
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
@@ -170,10 +179,10 @@ async def play_tictactoe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        f"<b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
-        f"<b>Player X:</b> {update.effective_user.first_name}\n"
-        f"<b>Player O:</b> Waiting for opponent...\n\n"
-        f"<i>Click the button below to join!</i>",
+        f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
+        f"<b>Player X:</b> <code>{update.effective_user.first_name}</code>\n"
+        f"<b>Player O:</b> <i>Waiting for opponent...</i>\n\n"
+        f"<i>Click the button below to join!</i></blockquote>",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
@@ -203,10 +212,10 @@ async def ttt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game['player_o_name'] = query.from_user.first_name
         
         await query.message.edit_text(
-            f"<b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
-            f"<b>Player X:</b> {game['player_x_name']}\n"
-            f"<b>Player O:</b> {game['player_o_name']}\n\n"
-            f"<b>Turn:</b> ❌ {game['player_x_name']}'s turn!",
+            f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
+            f"<b>Player X:</b> <code>{game['player_x_name']}</code>\n"
+            f"<b>Player O:</b> <code>{game['player_o_name']}</code>\n\n"
+            f"<b>Turn:</b> ❌ <code>{game['player_x_name']}</code>'s turn!</blockquote>",
             reply_markup=get_ttt_keyboard(game['board'], game_id),
             parse_mode=ParseMode.HTML
         )
@@ -234,10 +243,10 @@ async def ttt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if winner:
             if winner == "Draw":
-                text = f"<b>❌ Tic-Tac-Toe ⭕️</b>\n\nIt's a Draw! 🤝"
+                text = f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\nIt's a Draw! 🤝</blockquote>"
             else:
                 winner_name = game['player_x_name'] if winner == '❌' else game['player_o_name']
-                text = f"<b>❌ Tic-Tac-Toe ⭕️</b>\n\n<b>🎉 {winner_name} ({winner}) Wins!</b>"
+                text = f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n<b>🎉 <code>{winner_name}</code> ({winner}) Wins!</b></blockquote>"
                 
             await query.message.edit_text(
                 text,
@@ -250,10 +259,10 @@ async def ttt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             turn_name = game['player_x_name'] if game['turn'] == '❌' else game['player_o_name']
             
             await query.message.edit_text(
-                f"<b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
-                f"<b>Player X:</b> {game['player_x_name']}\n"
-                f"<b>Player O:</b> {game['player_o_name']}\n\n"
-                f"<b>Turn:</b> {game['turn']} {turn_name}'s turn!",
+                f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
+                f"<b>Player X:</b> <code>{game['player_x_name']}</code>\n"
+                f"<b>Player O:</b> <code>{game['player_o_name']}</code>\n\n"
+                f"<b>Turn:</b> {game['turn']} <code>{turn_name}</code>'s turn!</blockquote>",
                 reply_markup=get_ttt_keyboard(game['board'], game_id),
                 parse_mode=ParseMode.HTML
             )
