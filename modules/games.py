@@ -236,17 +236,6 @@ def check_ttt_winner(board):
     if "-" not in board: return "Draw"
     return None
 
-async def start_ttt_ai(user, chat_id, context, query=None):
-    game_id = f"ai_{chat_id}_{user.id}_{random.randint(1000,9999)}"
-    context.bot_data.setdefault('ttt_games', {})[game_id] = {
-        'board': ["-"] * 9, 'player_x': user.id, 'player_x_name': user.first_name,
-        'player_o': 'AI', 'player_o_name': 'Daisy AI', 'turn': '❌', 'mode': 'ai'
-    }
-    text = f"<blockquote><b>❌ Tic-Tac-Toe vs AI ⭕️</b>\nTurn: ❌ {user.first_name}</blockquote>"
-    kb = get_ttt_keyboard(["-"]*9, game_id)
-    if query: await query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
-    else: await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode=ParseMode.HTML)
-
 async def launch_ttt_multi(query, context, lobby, game_id):
     context.bot_data.setdefault('ttt_games', {})[game_id] = {
         'board': ["-"] * 9, 'player_x': lobby['p1'], 'player_x_name': lobby['p1_name'],
@@ -371,15 +360,29 @@ async def start_mcq(user, chat_id, context, subject, query=None):
     if not subject:
         subject = random.choice(["Coding", "C++", "Python", "C", "Chemistry", "Physics", "Biology", "General Knowledge"])
 
-    if query: await query.edit_message_text(f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
-    else: await context.bot.send_message(chat_id, f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
+    if query:
+        msg = await query.edit_message_text("Creating MCQ For You.", parse_mode=ParseMode.HTML)
+    else:
+        msg = await context.bot.send_message(chat_id, "Creating MCQ For You.", parse_mode=ParseMode.HTML)
 
+    # Simple text animation while generating
+    async def animate_text():
+        frames = ["Creating MCQ For You..", "Creating MCQ For You...", "Creating MCQ For You."]
+        for i in range(3):
+            await asyncio.sleep(0.5)
+            try:
+                if query: await query.edit_message_text(frames[i], parse_mode=ParseMode.HTML)
+                else: await context.bot.edit_message_text(text=frames[i], chat_id=chat_id, message_id=msg.message_id, parse_mode=ParseMode.HTML)
+            except: pass
+
+    anim_task = asyncio.create_task(animate_text())
     q_data = await fetch_mcq_from_ai(subject)
+    await anim_task
     
     try:
         await context.bot.send_poll(
             chat_id=chat_id,
-            question=f"[{subject}] {q_data['question']}",
+            question=f"{q_data['question']}",
             options=q_data['options'],
             type=Poll.QUIZ,
             correct_option_id=q_data['answer'],
