@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ParseMode
 from utils.admin_cache import check_admin, add_admin, remove_admin
 import asyncio
+import re
 
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private":

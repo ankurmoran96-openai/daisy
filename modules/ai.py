@@ -1,10 +1,12 @@
 import aiohttp
 import json
+import urllib.parse
 from datetime import datetime
+from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from telegram.constants import ParseMode
-from config import AI_API_KEY, AI_API_BASE, AI_MODEL_NAME, BOT_USERNAME
+from config import AI_API_KEY, AI_API_BASE, BOT_USERNAME, AI_MODEL_NAME_CHAT
 from database.db import get_user_memory, update_user_memory
 
 # --- AGENT TOOLS ---
@@ -22,19 +24,41 @@ def calculate_math(expression: str):
     except Exception as e:
         return f"Error: {e}"
 
+async def google_search(query: str):
+    """Searches the web using DuckDuckGo HTML."""
+    url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    html = await response.text()
+                    soup = BeautifulSoup(html, "html.parser")
+                    results = []
+                    for a in soup.find_all('a', class_='result__snippet'):
+                        results.append(a.text)
+                    if not results:
+                        return "No results found."
+                    return "\n".join(results[:5])
+                return "Failed to fetch search results."
+    except Exception as e:
+        return f"Search error: {e}"
+
 TOOLS = [
     {
         "type": "function",
         "function": {
             "name": "get_current_time",
-            "description": "Get the current real-time date and time. Call this if the user asks for the time or date."
+            "description": "Get the current real-time date and time."
         }
     },
     {
         "type": "function",
         "function": {
             "name": "calculate_math",
-            "description": "Calculate a mathematical expression. Call this whenever you need to do math.",
+            "description": "Calculate a mathematical expression.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -46,10 +70,53 @@ TOOLS = [
                 "required": ["expression"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "google_search",
+            "description": "Search the web to find up-to-date information.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query (e.g., 'latest python version')"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "trigger_game",
+            "description": "When a user asks to play a game, you MUST call this tool. Available games: rps, tictactoe, wordguess, dice, slots, darts, mcq. For MCQ, available subjects are BIO, CHEM, PHYSICS, AI/ML CODING, PYTHON, C++, C. If the user doesn't specify a mode, ask them or choose 'ai' by default.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "game_name": {
+                        "type": "string",
+                        "description": "The name of the game (rps, tictactoe, wordguess, dice, slots, darts, mcq)"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["ai", "multi"],
+                        "description": "Mode: ai (play with AI) or multi (multiplayer team/join)"
+                    },
+                    "subject": {
+                        "type": "string",
+                        "description": "ONLY FOR MCQ: The subject (BIO, CHEM, PHYSICS, AI/ML CODING, PYTHON, C++, C)."
+                    }
+                },
+                "required": ["game_name", "mode"]
+            }
+        }
     }
 ]
 
-async def generate_ai_response(prompt: str, user_memory: str) -> str:
+async def generate_ai_response(prompt: str, user_memory: str, update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     """Helper function to call 3rd party AI API with Agentic Tool Use."""
     if not AI_API_KEY or not AI_API_BASE:
         return "⚠️ <i>AI Configuration is missing. Please contact the administrator.</i>"
@@ -65,10 +132,9 @@ async def generate_ai_response(prompt: str, user_memory: str) -> str:
         f"Current Real-Time Date & Time: {current_time}. "
         "Your personality is a mix of a professional virtual assistant and a sassy, playful companion. "
         "Your developer is @Ankxrrrr and your support channel is @brahmosai. "
-        "You have complete mastery over group moderation commands and interactive mini-games. "
-        "Always respond intelligently. Use HTML formatting strictly (e.g., <b>bold</b>, <i>italic</i>, <code>code</code>). "
-        "You have access to tools. ALWAYS use tools if you need to calculate math or fetch dynamic info. "
-        "Crucial Behavior: Always be aware of the current time provided to you. If a user messages you late at night (e.g., between 12 AM / Midnight and 5 AM), playfully or caringly ask them why they are still awake so late, incorporating the current time into your response. "
+        "You have access to tools. ALWAYS use tools if you need to calculate math, fetch dynamic web info via google_search, or trigger games. "
+        "You host interactive games: RPS, Tic-Tac-Toe, Word Guess, Dice, Slots, Darts, and MCQ. "
+        "For games, you use Gemini 3 Flash in the backend via the trigger_game tool. If a user asks to play a game, use the `trigger_game` tool to launch it for them with the specified prompt instructions."
     )
     
     if user_memory:
@@ -80,7 +146,7 @@ async def generate_ai_response(prompt: str, user_memory: str) -> str:
     ]
 
     payload = {
-        "model": AI_MODEL_NAME,
+        "model": AI_MODEL_NAME_CHAT,
         "messages": messages,
         "tools": TOOLS,
         "tool_choice": "auto",
@@ -89,7 +155,6 @@ async def generate_ai_response(prompt: str, user_memory: str) -> str:
 
     try:
         async with aiohttp.ClientSession() as session:
-            # First API Call
             async with session.post(f"{AI_API_BASE}/chat/completions", headers=headers, json=payload) as response:
                 if response.status != 200:
                     return f"⚠️ <i>Error connecting to AI API: HTTP {response.status}</i>"
@@ -97,23 +162,29 @@ async def generate_ai_response(prompt: str, user_memory: str) -> str:
                 data = await response.json()
                 message = data['choices'][0]['message']
 
-                # Check if the AI decided to use a tool
                 if message.get("tool_calls"):
-                    messages.append(message) # Add the assistant's tool call request to history
+                    messages.append(message)
                     
                     for tool_call in message["tool_calls"]:
                         func_name = tool_call["function"]["name"]
                         func_args = json.loads(tool_call["function"]["arguments"])
                         
-                        # Execute local tools
                         if func_name == "get_current_time":
                             result = get_current_time()
                         elif func_name == "calculate_math":
                             result = calculate_math(func_args.get("expression", ""))
+                        elif func_name == "google_search":
+                            result = await google_search(func_args.get("query", ""))
+                        elif func_name == "trigger_game":
+                            game = func_args.get("game_name", "").lower()
+                            mode = func_args.get("mode", "ai")
+                            subj = func_args.get("subject", "PYTHON")
+                            from modules.games import start_game_from_ai
+                            await start_game_from_ai(update, context, game, mode, subj)
+                            result = f"Successfully launched {game} in {mode} mode for the user."
                         else:
                             result = "Error: Unknown tool."
                             
-                        # Feed the tool result back to the AI
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call["id"],
@@ -121,7 +192,6 @@ async def generate_ai_response(prompt: str, user_memory: str) -> str:
                             "content": result
                         })
 
-                    # Second API Call (with tool results included)
                     payload["messages"] = messages
                     async with session.post(f"{AI_API_BASE}/chat/completions", headers=headers, json=payload) as second_response:
                         if second_response.status == 200:
@@ -130,7 +200,6 @@ async def generate_ai_response(prompt: str, user_memory: str) -> str:
                         else:
                             return f"⚠️ <i>Error on second AI pass: HTTP {second_response.status}</i>"
                 else:
-                    # Normal text response
                     return message.get('content', '')
 
     except Exception as e:
@@ -144,15 +213,13 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     bot_username = BOT_USERNAME or context.bot.username
     
-    # Check if bot is mentioned or if it's a direct message
     is_private = update.message.chat.type == "private"
     is_reply_to_bot = update.message.reply_to_message and update.message.reply_to_message.from_user.id == context.bot.id
     is_mentioned = bot_username and f"@{bot_username}" in text
 
     if not (is_private or is_reply_to_bot or is_mentioned):
-        return # Do not respond if not triggered
+        return
 
-    # Clean the prompt
     prompt = text.replace(f"@{bot_username}", "").strip() if bot_username else text.strip()
     
     if not prompt:
@@ -160,22 +227,15 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user = update.effective_user
-    
-    # Send typing action
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
-
-    # Retrieve memory
     user_memory = await get_user_memory(user.id)
     
-    # Generate response
-    response_text = await generate_ai_response(prompt, user_memory)
+    response_text = await generate_ai_response(prompt, user_memory, update, context)
     
-    # Save to memory (simple summarization/saving for now)
     memory_update = f"User: {prompt}\nDaisy: {response_text}"
     await update_user_memory(user.id, user.username or user.first_name, memory_update)
 
-    # Reply using HTML parse mode
-    await update.message.reply_text(response_text, parse_mode=ParseMode.HTML)
+    if response_text:
+        await update.message.reply_text(response_text, parse_mode=ParseMode.HTML)
 
-# Setup handler
 ai_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_ai_message)

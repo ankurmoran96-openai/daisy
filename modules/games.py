@@ -1,145 +1,235 @@
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+import random
+import asyncio
+import json
+import aiohttp
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, Poll
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 from database.db import update_game_stat
-import random
-import asyncio
+from config import AI_API_KEY, AI_API_BASE, AI_MODEL_NAME_GAME
 
-# --- Rock Paper Scissors (Interactive) ---
-async def play_rps(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    keyboard = [
-        [
-            InlineKeyboardButton("🪨 Rock", callback_data=f"rps_rock_{user_id}"),
-            InlineKeyboardButton("📄 Paper", callback_data=f"rps_paper_{user_id}"),
-            InlineKeyboardButton("✂️ Scissors", callback_data=f"rps_scissors_{user_id}")
-        ]
+def get_play_again_keyboard(game: str, extra: str = ""):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🤖 Play Again (AI)", callback_data=f"gmode_{game}_ai_{extra}")],
+        [InlineKeyboardButton("👥 Play Again (Multi)", callback_data=f"gmode_{game}_multi_{extra}")]
+    ])
+
+# --- AI Helper for MCQ ---
+async def fetch_mcq_from_ai(subject: str) -> dict:
+    prompt = (
+        f"Generate a multiple choice question about {subject}. "
+        "Return ONLY a valid JSON object with EXACTLY these keys: "
+        "'question' (string), 'options' (list of exactly 4 string options), "
+        "'answer' (integer 0-3 representing the index of the correct option). "
+        "Do not use markdown formatting blocks, just raw JSON."
+    )
+    headers = {"Authorization": f"Bearer {AI_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": AI_MODEL_NAME_GAME,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    
+    default_q = {
+        "question": f"Default {subject} Question: What is 2 + 2?",
+        "options": ["1", "2", "3", "4"],
+        "answer": 3
+    }
+
+    if not AI_API_KEY or not AI_API_BASE:
+        return default_q
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"{AI_API_BASE}/chat/completions", headers=headers, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    content = data['choices'][0]['message']['content'].strip()
+                    if content.startswith("```json"):
+                        content = content[7:-3].strip()
+                    elif content.startswith("```"):
+                        content = content[3:-3].strip()
+                    parsed = json.loads(content)
+                    if "question" in parsed and "options" in parsed and "answer" in parsed:
+                        return parsed
+    except Exception as e:
+        print(f"Error fetching MCQ: {e}")
+    return default_q
+
+# --- Command Entry Points ---
+async def cmd_rps(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'rps')
+async def cmd_tictactoe(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'tictactoe')
+async def cmd_wordguess(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'wordguess')
+async def cmd_dice(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'dice')
+async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'slots')
+async def cmd_darts(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'darts')
+
+async def cmd_mcq(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    kb = [
+        [InlineKeyboardButton("BIO", callback_data="mcqsubj_BIO"), InlineKeyboardButton("CHEM", callback_data="mcqsubj_CHEM")],
+        [InlineKeyboardButton("PHYSICS", callback_data="mcqsubj_PHYSICS"), InlineKeyboardButton("AI/ML CODING", callback_data="mcqsubj_AIML")],
+        [InlineKeyboardButton("PYTHON", callback_data="mcqsubj_PYTHON"), InlineKeyboardButton("C++", callback_data="mcqsubj_CPP"), InlineKeyboardButton("C", callback_data="mcqsubj_C")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "<blockquote><b>🎮 Rock, Paper, Scissors!</b>\nChoose your weapon:</blockquote>",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
+        "<blockquote><b>📚 MCQ Game</b>\nSelect a subject:</blockquote>",
+        reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML
     )
 
-async def rps_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def mcq_subj_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    
+    subj = query.data.split('_')[1]
+    await query.answer()
+    await prompt_mode(update, context, 'mcq', extra=subj, is_query=True)
+
+async def prompt_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, game: str, extra: str = "", is_query: bool = False):
+    kb = [
+        [InlineKeyboardButton("🤖 Play with AI", callback_data=f"gmode_{game}_ai_{extra}")],
+        [InlineKeyboardButton("👥 Multiplayer", callback_data=f"gmode_{game}_multi_{extra}")]
+    ]
+    text = f"<blockquote><b>🎮 {game.upper()}</b>\nChoose your game mode:</blockquote>"
+    if is_query:
+        await update.callback_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
+
+# --- AI Trigger ---
+async def start_game_from_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, game: str, mode: str, subject: str = ""):
+    extra = subject if game == 'mcq' else ""
+    await route_game(update, context, game, mode, extra, is_ai_trigger=True)
+
+# --- Router & Lobbies ---
+async def gmode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    parts = query.data.split('_')
+    game = parts[1]
+    mode = parts[2]
+    extra = parts[3] if len(parts) > 3 else ""
+    await query.answer()
+    await route_game(update, context, game, mode, extra, query=query)
+
+async def route_game(update: Update, context: ContextTypes.DEFAULT_TYPE, game: str, mode: str, extra: str, query=None, is_ai_trigger=False):
+    chat_id = query.message.chat_id if query else update.effective_chat.id
+    user = query.from_user if query else update.effective_user
+
+    if mode == 'ai':
+        if game == 'rps': await start_rps_ai(user, chat_id, context, query)
+        elif game == 'tictactoe': await start_ttt_ai(user, chat_id, context, query)
+        elif game == 'wordguess': await start_wordguess(user, chat_id, context, query, ai_mode=True)
+        elif game in ['dice', 'slots', 'darts']: await start_casino_ai(user, chat_id, context, game, query)
+        elif game == 'mcq': await start_mcq(user, chat_id, context, extra, query)
+    elif mode == 'multi':
+        msg_id = str(query.message.message_id) if query else str(update.message.message_id)
+        game_id = f"{chat_id}_{msg_id}"
+        
+        context.bot_data.setdefault('lobbies', {})[game_id] = {
+            'game': game, 'extra': extra, 'p1': user.id, 'p1_name': user.first_name, 'p2': None, 'p2_name': None
+        }
+        kb = [[InlineKeyboardButton("🎮 Join Game (P2)", callback_data=f"joinlobby_{game_id}")]]
+        text = f"<blockquote><b>👥 {game.upper()} Multiplayer Lobby</b>\n\nPlayer 1: {user.first_name}\nPlayer 2: Waiting...</blockquote>"
+        if query: await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
+        else: await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
+
+async def joinlobby_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    parts = query.data.split('_')
+    game_id = "_".join(parts[1:])
+    lobby = context.bot_data.get('lobbies', {}).get(game_id)
+
+    if not lobby: return await query.answer("Lobby expired!", show_alert=True)
+    if query.from_user.id == lobby['p1']: return await query.answer("You are already P1!", show_alert=True)
+
+    lobby['p2'] = query.from_user.id
+    lobby['p2_name'] = query.from_user.first_name
+    await query.answer("Joined!")
+
+    game = lobby['game']
+    extra = lobby['extra']
+
+    if game == 'rps': await launch_rps_multi(query, context, lobby, game_id)
+    elif game == 'tictactoe': await launch_ttt_multi(query, context, lobby, game_id)
+    elif game in ['dice', 'slots', 'darts']: await launch_casino_multi(query, context, lobby, game, game_id)
+    elif game == 'wordguess': await start_wordguess(query.from_user, query.message.chat_id, context, query, ai_mode=False)
+    elif game == 'mcq': await start_mcq(query.from_user, query.message.chat_id, context, extra, query)
+
+# --- RPS Logic ---
+async def start_rps_ai(user, chat_id, context, query=None):
+    kb = [[
+        InlineKeyboardButton("🪨 Rock", callback_data=f"rpsai_rock_{user.id}"),
+        InlineKeyboardButton("📄 Paper", callback_data=f"rpsai_paper_{user.id}"),
+        InlineKeyboardButton("✂️ Scissors", callback_data=f"rpsai_scissors_{user.id}")
+    ]]
+    text = "<blockquote><b>🎮 RPS (vs AI)</b>\nChoose your weapon:</blockquote>"
+    if query: await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
+    else: await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
+
+async def rpsai_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
     parts = query.data.split('_')
     user_choice = parts[1]
-    original_user_id = int(parts[2])
-    
-    if query.from_user.id != original_user_id:
-        await query.answer("This is not your game!", show_alert=True)
-        return
-        
-    await query.answer()
+    uid = int(parts[2])
+    if query.from_user.id != uid: return await query.answer("Not your game!")
     
     bot_choice = random.choice(['rock', 'paper', 'scissors'])
-    
     emojis = {'rock': '🪨', 'paper': '📄', 'scissors': '✂️'}
     
-    if user_choice == bot_choice:
-        result = "It's a draw! 🤝"
+    if user_choice == bot_choice: result = "It's a draw! 🤝"
     elif (user_choice == 'rock' and bot_choice == 'scissors') or \
          (user_choice == 'paper' and bot_choice == 'rock') or \
          (user_choice == 'scissors' and bot_choice == 'paper'):
         result = "You win! 🎉"
-        await update_game_stat(query.from_user.id, 'rps', 'win')
+        await update_game_stat(uid, 'rps', 'win')
     else:
         result = "I win! 😈"
-        await update_game_stat(query.from_user.id, 'rps', 'loss')
+        await update_game_stat(uid, 'rps', 'loss')
         
     await query.edit_message_text(
-        f"<blockquote><b>🎮 Rock, Paper, Scissors!</b>\n\n"
-        f"<b>You:</b> {emojis[user_choice]} <code>{user_choice.title()}</code>\n"
-        f"<b>Daisy:</b> {emojis[bot_choice]} <code>{bot_choice.title()}</code>\n\n"
-        f"<b>Result:</b> {result}</blockquote>",
+        f"<blockquote><b>🎮 RPS vs AI</b>\n\n<b>You:</b> {emojis[user_choice]}\n<b>AI:</b> {emojis[bot_choice]}\n\n<b>{result}</b></blockquote>",
+        reply_markup=get_play_again_keyboard('rps'),
         parse_mode=ParseMode.HTML
     )
 
-# --- Word Guess (Interactive UI) ---
-WORDS = ['telegram', 'python', 'daisy', 'artificial', 'intelligence', 'openai', 'developer']
+async def launch_rps_multi(query, context, lobby, game_id):
+    context.bot_data.setdefault('rps_multi', {})[game_id] = {'p1': lobby['p1'], 'p2': lobby['p2'], 'p1_choice': None, 'p2_choice': None, 'p1_name': lobby['p1_name'], 'p2_name': lobby['p2_name']}
+    kb = [[
+        InlineKeyboardButton("🪨 Rock", callback_data=f"rpsm_rock_{game_id}"),
+        InlineKeyboardButton("📄 Paper", callback_data=f"rpsm_paper_{game_id}"),
+        InlineKeyboardButton("✂️ Scissors", callback_data=f"rpsm_scissors_{game_id}")
+    ]]
+    text = f"<blockquote><b>🎮 RPS Multiplayer</b>\n{lobby['p1_name']} vs {lobby['p2_name']}\nBoth players, select your choice!</blockquote>"
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
 
-async def play_wordguess(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    word = random.choice(WORDS)
-    scrambled = "".join(random.sample(word, len(word)))
-    context.chat_data['word'] = word
-    
-    text = (
-        "<blockquote><b>🧠 Word Guess Challenge!</b>\n\n"
-        f"Unscramble this word: <code>{scrambled.upper()}</code>\n\n"
-        "<i>Reply with <code>/guess [your_answer]</code> to win!</i></blockquote>"
-    )
-    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+async def rpsm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    parts = query.data.split('_')
+    choice = parts[1]
+    game_id = "_".join(parts[2:])
+    game = context.bot_data.get('rps_multi', {}).get(game_id)
+    if not game: return await query.answer("Game expired!")
 
-async def guess_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if 'word' not in context.chat_data:
-        await update.message.reply_text("<blockquote><b>No game active. Start one with /wordguess</b></blockquote>", parse_mode=ParseMode.HTML)
-        return
-        
-    if not context.args:
-         await update.message.reply_text("<blockquote><b>Usage:</b> <code>/guess [your_answer]</code></blockquote>", parse_mode=ParseMode.HTML)
-         return
-         
-    guess = context.args[0].lower()
-    correct_word = context.chat_data['word']
-    
-    if guess == correct_word:
-        await update.message.reply_text(f"<blockquote><b>🎉 Correct!</b> The word was <code>{correct_word.upper()}</code>.</blockquote>", parse_mode=ParseMode.HTML)
-        await update_game_stat(update.effective_user.id, 'word', 'win')
-        del context.chat_data['word']
+    uid = query.from_user.id
+    if uid == game['p1']:
+        game['p1_choice'] = choice
+        await query.answer("Choice registered!")
+    elif uid == game['p2']:
+        game['p2_choice'] = choice
+        await query.answer("Choice registered!")
     else:
-        await update.message.reply_text("<blockquote><b>❌ Incorrect! Try again.</b></blockquote>", parse_mode=ParseMode.HTML)
+        return await query.answer("Not your game!")
 
-# --- Dice Roll (Animated) ---
-async def play_dice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await context.bot.send_dice(chat_id=update.effective_chat.id, emoji='🎲')
-    await asyncio.sleep(4)
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"<blockquote><b>🎲 You rolled a <code>{msg.dice.value}</code>!</b></blockquote>",
-        reply_to_message_id=msg.message_id,
-        parse_mode=ParseMode.HTML
-    )
+    if game['p1_choice'] and game['p2_choice']:
+        c1, c2 = game['p1_choice'], game['p2_choice']
+        emojis = {'rock': '🪨', 'paper': '📄', 'scissors': '✂️'}
+        if c1 == c2: res = "It's a draw! 🤝"
+        elif (c1=='rock' and c2=='scissors') or (c1=='paper' and c2=='rock') or (c1=='scissors' and c2=='paper'): res = f"{game['p1_name']} Wins! 🎉"
+        else: res = f"{game['p2_name']} Wins! 🎉"
 
-# --- Slot Machine (Animated) ---
-async def play_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await context.bot.send_dice(chat_id=update.effective_chat.id, emoji='🎰')
-    await asyncio.sleep(4)
-    val = msg.dice.value
-    # Jackpot combinations in Telegram slots
-    if val in [1, 22, 43, 64]:
-        text = "<blockquote><b>🎰 JACKPOT! You won! 🎉</b></blockquote>"
-    else:
-        text = "<blockquote><b>🎰 Better luck next time!</b></blockquote>"
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=text,
-        reply_to_message_id=msg.message_id,
-        parse_mode=ParseMode.HTML
-    )
+        await query.edit_message_text(
+            f"<blockquote><b>🎮 RPS Result</b>\n{game['p1_name']}: {emojis[c1]}\n{game['p2_name']}: {emojis[c2]}\n\n<b>{res}</b></blockquote>", 
+            reply_markup=get_play_again_keyboard('rps'),
+            parse_mode=ParseMode.HTML
+        )
+        del context.bot_data['rps_multi'][game_id]
 
-# --- Darts (Animated) ---
-async def play_darts(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await context.bot.send_dice(chat_id=update.effective_chat.id, emoji='🎯')
-    await asyncio.sleep(4)
-    val = msg.dice.value
-    if val == 6:
-        text = "<blockquote><b>🎯 Bullseye! Perfect shot! 🏆</b></blockquote>"
-    elif val >= 4:
-        text = "<blockquote><b>🎯 Good shot!</b></blockquote>"
-    else:
-        text = "<blockquote><b>🎯 Missed the center. Try again!</b></blockquote>"
-        
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=text,
-        reply_to_message_id=msg.message_id,
-        parse_mode=ParseMode.HTML
-    )
-
-# --- Tic Tac Toe (Multiplayer) ---
+# --- Tic-Tac-Toe Logic ---
 def get_ttt_keyboard(board, game_id):
     keyboard = []
     for i in range(3):
@@ -147,136 +237,181 @@ def get_ttt_keyboard(board, game_id):
         for j in range(3):
             val = board[i*3 + j]
             text = " " if val == "-" else val
-            row.append(InlineKeyboardButton(text, callback_data=f"tttc_{game_id}_{i*3 + j}"))
+            row.append(InlineKeyboardButton(text, callback_data=f"tttc_{i*3+j}_{game_id}"))
         keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
 def check_ttt_winner(board):
     win_cond = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
     for a, b, c in win_cond:
-        if board[a] != "-" and board[a] == board[b] == board[c]:
-            return board[a]
-    if "-" not in board:
-        return "Draw"
+        if board[a] != "-" and board[a] == board[b] == board[c]: return board[a]
+    if "-" not in board: return "Draw"
     return None
 
-async def play_tictactoe(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    game_id = str(update.effective_message.id)
-    
-    if 'ttt_games' not in context.bot_data:
-        context.bot_data['ttt_games'] = {}
-        
-    context.bot_data['ttt_games'][game_id] = {
-        'board': ["-"] * 9,
-        'player_x': update.effective_user.id,
-        'player_x_name': update.effective_user.first_name,
-        'player_o': None,
-        'player_o_name': None,
-        'turn': '❌'
+async def start_ttt_ai(user, chat_id, context, query=None):
+    game_id = f"ai_{chat_id}_{user.id}_{random.randint(1000,9999)}"
+    context.bot_data.setdefault('ttt_games', {})[game_id] = {
+        'board': ["-"] * 9, 'player_x': user.id, 'player_x_name': user.first_name,
+        'player_o': 'AI', 'player_o_name': 'Daisy AI', 'turn': '❌', 'mode': 'ai'
     }
-    
-    keyboard = [[InlineKeyboardButton("🎮 Join Game (Player O)", callback_data=f"tttjoin_{game_id}")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
-        f"<b>Player X:</b> <code>{update.effective_user.first_name}</code>\n"
-        f"<b>Player O:</b> <i>Waiting for opponent...</i>\n\n"
-        f"<i>Click the button below to join!</i></blockquote>",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
+    text = f"<blockquote><b>❌ Tic-Tac-Toe vs AI ⭕️</b>\nTurn: ❌ {user.first_name}</blockquote>"
+    kb = get_ttt_keyboard(["-"]*9, game_id)
+    if query: await query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    else: await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode=ParseMode.HTML)
+
+async def launch_ttt_multi(query, context, lobby, game_id):
+    context.bot_data.setdefault('ttt_games', {})[game_id] = {
+        'board': ["-"] * 9, 'player_x': lobby['p1'], 'player_x_name': lobby['p1_name'],
+        'player_o': lobby['p2'], 'player_o_name': lobby['p2_name'], 'turn': '❌', 'mode': 'multi'
+    }
+    text = f"<blockquote><b>❌ Tic-Tac-Toe Multiplayer ⭕️</b>\n❌ {lobby['p1_name']} vs ⭕️ {lobby['p2_name']}\nTurn: ❌ {lobby['p1_name']}</blockquote>"
+    await query.edit_message_text(text, reply_markup=get_ttt_keyboard(["-"]*9, game_id), parse_mode=ParseMode.HTML)
 
 async def ttt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    data = query.data.split('_')
-    action = data[0]
-    game_id = data[1]
+    parts = query.data.split('_')
+    pos = int(parts[1])
+    game_id = "_".join(parts[2:])
     
-    if 'ttt_games' not in context.bot_data or game_id not in context.bot_data['ttt_games']:
-        await query.answer("This game has expired!", show_alert=True)
+    game = context.bot_data.get('ttt_games', {}).get(game_id)
+    if not game: return await query.answer("Game expired!")
+
+    uid = query.from_user.id
+    if game['turn'] == '❌' and uid != game['player_x']: return await query.answer("Not your turn!")
+    if game['mode'] == 'multi' and game['turn'] == '⭕️' and uid != game['player_o']: return await query.answer("Not your turn!")
+
+    if game['board'][pos] != "-": return await query.answer("Spot taken!")
+
+    game['board'][pos] = game['turn']
+    winner = check_ttt_winner(game['board'])
+
+    if winner:
+        await finish_ttt(query, game, game_id, winner)
         return
+
+    game['turn'] = '⭕️' if game['turn'] == '❌' else '❌'
+
+    if game['mode'] == 'ai' and game['turn'] == '⭕️':
+        empty_spots = [i for i, v in enumerate(game['board']) if v == "-"]
+        if empty_spots:
+            ai_pos = random.choice(empty_spots)
+            game['board'][ai_pos] = '⭕️'
+            winner = check_ttt_winner(game['board'])
+            if winner:
+                await finish_ttt(query, game, game_id, winner)
+                return
+            game['turn'] = '❌'
+
+    turn_name = game['player_x_name'] if game['turn'] == '❌' else game['player_o_name']
+    await query.edit_message_text(
+        f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\nTurn: {game['turn']} {turn_name}</blockquote>",
+        reply_markup=get_ttt_keyboard(game['board'], game_id), parse_mode=ParseMode.HTML
+    )
+
+async def finish_ttt(query, game, game_id, winner):
+    if winner == "Draw": text = "It's a Draw! 🤝"
+    else:
+        w_name = game['player_x_name'] if winner == '❌' else game['player_o_name']
+        text = f"🎉 {w_name} ({winner}) Wins!"
         
-    game = context.bot_data['ttt_games'][game_id]
-    user_id = query.from_user.id
+    kb_list = get_ttt_keyboard(game['board'], game_id).inline_keyboard
+    kb_list.append([InlineKeyboardButton("🤖 Play Again (AI)", callback_data=f"gmode_tictactoe_ai_")])
+    kb_list.append([InlineKeyboardButton("👥 Play Again (Multi)", callback_data=f"gmode_tictactoe_multi_")])
     
-    if action == "tttjoin":
-        if game['player_x'] == user_id:
-            await query.answer("You are already Player X!", show_alert=True)
-            return
-        if game['player_o'] is not None:
-            await query.answer("Someone already joined as Player O!", show_alert=True)
-            return
-            
-        game['player_o'] = user_id
-        game['player_o_name'] = query.from_user.first_name
+    await query.edit_message_text(
+        f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n{text}</blockquote>",
+        reply_markup=InlineKeyboardMarkup(kb_list), parse_mode=ParseMode.HTML
+    )
+    del context.bot_data['ttt_games'][game_id]
+
+# --- Casino Games ---
+async def start_casino_ai(user, chat_id, context, game, query=None):
+    if query: await query.edit_message_text(f"Rolling {game}...", parse_mode=ParseMode.HTML)
+    emojis = {'dice': '🎲', 'slots': '🎰', 'darts': '🎯'}
+    msg = await context.bot.send_dice(chat_id=chat_id, emoji=emojis[game])
+    await asyncio.sleep(4)
+    val = msg.dice.value
+    
+    if game == 'slots':
+        res = "🎰 JACKPOT! 🎉" if val in [1, 22, 43, 64] else "🎰 Better luck next time!"
+    elif game == 'darts':
+        res = "🎯 Bullseye! 🏆" if val == 6 else ("🎯 Good shot!" if val >= 4 else "🎯 Missed center.")
+    else:
+        res = f"🎲 You rolled {val}!"
         
-        await query.message.edit_text(
-            f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
-            f"<b>Player X:</b> <code>{game['player_x_name']}</code>\n"
-            f"<b>Player O:</b> <code>{game['player_o_name']}</code>\n\n"
-            f"<b>Turn:</b> ❌ <code>{game['player_x_name']}</code>'s turn!</blockquote>",
-            reply_markup=get_ttt_keyboard(game['board'], game_id),
-            parse_mode=ParseMode.HTML
+    await context.bot.send_message(chat_id, f"<blockquote><b>{res}</b></blockquote>", reply_to_message_id=msg.message_id, reply_markup=get_play_again_keyboard(game), parse_mode=ParseMode.HTML)
+
+async def launch_casino_multi(query, context, lobby, game, game_id):
+    chat_id = query.message.chat_id
+    await query.edit_message_text(f"<blockquote><b>{game.upper()} Multiplayer</b>\n{lobby['p1_name']} vs {lobby['p2_name']}! Rolling...</blockquote>", parse_mode=ParseMode.HTML)
+    emojis = {'dice': '🎲', 'slots': '🎰', 'darts': '🎯'}
+    emoji = emojis[game]
+
+    msg1 = await context.bot.send_dice(chat_id=chat_id, emoji=emoji)
+    await asyncio.sleep(1)
+    msg2 = await context.bot.send_dice(chat_id=chat_id, emoji=emoji)
+
+    await asyncio.sleep(4)
+    v1, v2 = msg1.dice.value, msg2.dice.value
+    if v1 > v2: res = f"🎉 {lobby['p1_name']} wins!"
+    elif v2 > v1: res = f"🎉 {lobby['p2_name']} wins!"
+    else: res = "It's a draw! 🤝"
+
+    await context.bot.send_message(chat_id, f"<blockquote>{lobby['p1_name']} rolled: {v1}\n{lobby['p2_name']} rolled: {v2}\n\n<b>{res}</b></blockquote>", reply_markup=get_play_again_keyboard(game), parse_mode=ParseMode.HTML)
+
+# --- Wordguess ---
+async def start_wordguess(user, chat_id, context, query=None, ai_mode=True):
+    word = random.choice(['telegram', 'python', 'daisy', 'artificial', 'intelligence', 'openai', 'developer'])
+    scrambled = "".join(random.sample(word, len(word)))
+    context.chat_data['word'] = word
+    mode_text = "(Solo/AI Mode)" if ai_mode else "(Multiplayer - First to guess wins!)"
+    text = f"<blockquote><b>🧠 Word Guess {mode_text}</b>\nUnscramble: <code>{scrambled.upper()}</code>\nReply with <code>/guess [answer]</code></blockquote>"
+    if query: await query.edit_message_text(text, parse_mode=ParseMode.HTML)
+    else: await context.bot.send_message(chat_id, text, parse_mode=ParseMode.HTML)
+
+async def guess_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if 'word' not in context.chat_data: return await update.message.reply_text("No game active.")
+    if not context.args: return await update.message.reply_text("Usage: /guess [word]")
+    guess = context.args[0].lower()
+    if guess == context.chat_data['word']:
+        await update.message.reply_text(f"🎉 Correct, {update.effective_user.first_name}!", reply_markup=get_play_again_keyboard('wordguess'))
+        del context.chat_data['word']
+    else:
+        await update.message.reply_text("❌ Incorrect!")
+
+# --- MCQ Game ---
+async def start_mcq(user, chat_id, context, subject, query=None):
+    if query: await query.edit_message_text(f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
+    else: await context.bot.send_message(chat_id, f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
+
+    q_data = await fetch_mcq_from_ai(subject)
+    
+    try:
+        await context.bot.send_poll(
+            chat_id=chat_id,
+            question=f"[{subject}] {q_data['question']}",
+            options=q_data['options'],
+            type=Poll.QUIZ,
+            correct_option_id=q_data['answer'],
+            is_anonymous=False
         )
-        await query.answer("You joined as Player O!")
-        return
+    except Exception as e:
+        await context.bot.send_message(chat_id, "⚠️ Error sending MCQ Poll. Try again.")
 
-    if action == "tttc":
-        pos = int(data[2])
-        
-        if game['player_o'] is None:
-            await query.answer("Waiting for Player O to join!", show_alert=True)
-            return
-            
-        if (game['turn'] == '❌' and user_id != game['player_x']) or \
-           (game['turn'] == '⭕️' and user_id != game['player_o']):
-            await query.answer("It's not your turn!", show_alert=True)
-            return
-            
-        if game['board'][pos] != "-":
-            await query.answer("That spot is taken!", show_alert=True)
-            return
-            
-        game['board'][pos] = game['turn']
-        winner = check_ttt_winner(game['board'])
-        
-        if winner:
-            if winner == "Draw":
-                text = f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\nIt's a Draw! 🤝</blockquote>"
-            else:
-                winner_name = game['player_x_name'] if winner == '❌' else game['player_o_name']
-                text = f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n<b>🎉 <code>{winner_name}</code> ({winner}) Wins!</b></blockquote>"
-                
-            await query.message.edit_text(
-                text,
-                reply_markup=get_ttt_keyboard(game['board'], game_id),
-                parse_mode=ParseMode.HTML
-            )
-            del context.bot_data['ttt_games'][game_id]
-        else:
-            game['turn'] = '⭕️' if game['turn'] == '❌' else '❌'
-            turn_name = game['player_x_name'] if game['turn'] == '❌' else game['player_o_name']
-            
-            await query.message.edit_text(
-                f"<blockquote><b>❌ Tic-Tac-Toe ⭕️</b>\n\n"
-                f"<b>Player X:</b> <code>{game['player_x_name']}</code>\n"
-                f"<b>Player O:</b> <code>{game['player_o_name']}</code>\n\n"
-                f"<b>Turn:</b> {game['turn']} <code>{turn_name}</code>'s turn!</blockquote>",
-                reply_markup=get_ttt_keyboard(game['board'], game_id),
-                parse_mode=ParseMode.HTML
-            )
-        await query.answer()
-
-# Game Handlers List
+# --- Handlers List ---
 handlers = [
-    CommandHandler('rps', play_rps),
-    CommandHandler('wordguess', play_wordguess),
+    CommandHandler('rps', cmd_rps),
+    CommandHandler('tictactoe', cmd_tictactoe),
+    CommandHandler('wordguess', cmd_wordguess),
+    CommandHandler('dice', cmd_dice),
+    CommandHandler('slots', cmd_slots),
+    CommandHandler('darts', cmd_darts),
+    CommandHandler('mcq', cmd_mcq),
     CommandHandler('guess', guess_word),
-    CommandHandler('dice', play_dice),
-    CommandHandler('slots', play_slots),
-    CommandHandler('darts', play_darts),
-    CommandHandler('tictactoe', play_tictactoe),
-    CallbackQueryHandler(rps_callback, pattern='^rps_'),
-    CallbackQueryHandler(ttt_callback, pattern='^ttt')
+    CallbackQueryHandler(mcq_subj_callback, pattern='^mcqsubj_'),
+    CallbackQueryHandler(gmode_callback, pattern='^gmode_'),
+    CallbackQueryHandler(joinlobby_callback, pattern='^joinlobby_'),
+    CallbackQueryHandler(rpsai_callback, pattern='^rpsai_'),
+    CallbackQueryHandler(rpsm_callback, pattern='^rpsm_'),
+    CallbackQueryHandler(ttt_callback, pattern='^tttc_')
 ]
