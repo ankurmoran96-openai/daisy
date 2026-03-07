@@ -27,7 +27,8 @@ def get_start_keyboard():
             InlineKeyboardButton("👨‍💻 Dev", url="https://t.me/Ankxrrrr")
         ],
         [
-            InlineKeyboardButton("📚 HELP", callback_data="help_menu")
+            InlineKeyboardButton("📚 HELP", callback_data="help_menu"),
+            InlineKeyboardButton("🎮 GAMES", callback_data="games_menu")
         ],
         [
             InlineKeyboardButton("➕ ADD ME TO GROUP", url=f"https://t.me/{bot_username}?startgroup=true")
@@ -36,7 +37,18 @@ def get_start_keyboard():
 
 def get_help_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 BACK", callback_data="start_menu")]
+        [
+            InlineKeyboardButton("🎮 GAMES", callback_data="games_menu"),
+            InlineKeyboardButton("🔙 BACK", callback_data="start_menu")
+        ]
+    ])
+
+def get_games_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📚 HELP", callback_data="help_menu"),
+            InlineKeyboardButton("🔙 BACK", callback_data="start_menu")
+        ]
     ])
 
 def get_start_caption(username):
@@ -59,7 +71,7 @@ def get_start_caption(username):
 def get_help_caption(username):
     return (
         f"<b>🌸 Daisy's Command Center 🌸</b>\n"
-        f"<i>Hello {username}, here is my complete command list!</i>\n"
+        f"<i>Hello {username}, here is my moderation list!</i>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
         f"<b>👮‍♂️ Admin Commands</b>\n"
         f"<code>/ban</code> | <code>/dban</code> | <code>/sban</code> | <code>/tban</code>\n"
@@ -74,11 +86,24 @@ def get_help_caption(username):
         f"<code>/setgtitle</code> | <code>/setgdesc</code> - Manage group info\n"
         f"<code>/exportlink</code> - Generate invite link\n"
         f"<code>/setadmin [tag]</code> | <code>/deladmin</code> - Manage Bot Admins\n\n"
-        f"<b>🎮 Mini Games</b>\n"
-        f"<code>/rps</code>, <code>/wordguess</code>, <code>/dice</code> 🎲\n"
-        f"<code>/slots</code> 🎰, <code>/darts</code> 🎯, <code>/tictactoe</code> ❌⭕️\n\n"
         f"<b>🤖 AI Chat Engine</b>\n"
         f"Mention <code>@daisyslaysbot</code> or reply to me to start chatting!"
+    )
+
+def get_games_caption(username):
+    return (
+        f"<b>🎮 Daisy's Arcade 🎮</b>\n"
+        f"<i>Hello {username}, ready to play some games?</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"<b>🎲 Solo Games</b>\n"
+        f"<code>/wordguess</code> - Unscramble the tech word\n"
+        f"<code>/dice</code> - Roll the lucky dice 🎲\n"
+        f"<code>/slots</code> - Hit the Casino jackpot 🎰\n"
+        f"<code>/darts</code> - Aim for the bullseye 🎯\n\n"
+        f"<b>👥 Multiplayer Games</b>\n"
+        f"<code>/rps</code> - Interactive Rock-Paper-Scissors (play with me!)\n"
+        f"<code>/tictactoe</code> - Full Multiplayer Showdown ❌⭕️\n\n"
+        f"<i>Just type the command in the group to start a game!</i>"
     )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -101,13 +126,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_start_keyboard()
         )
 
+async def games_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Games command handler."""
+    user_name = update.effective_user.first_name
+    caption = get_games_caption(user_name)
+    
+    if os.path.exists(BANNER_PATH):
+        with open(BANNER_PATH, 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=get_games_keyboard()
+            )
+    else:
+        await update.message.reply_text(
+            text=caption,
+            parse_mode=ParseMode.HTML,
+            reply_markup=get_games_keyboard()
+        )
+
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the Help and Back inline buttons."""
     query = update.callback_query
     await query.answer()
 
+    user_name = query.from_user.first_name
+
     if query.data == "help_menu":
-        user_name = query.from_user.first_name
         help_text = get_help_caption(user_name)
         try:
             # We must edit the caption since the original message is a photo
@@ -123,9 +169,23 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode=ParseMode.HTML,
                 reply_markup=get_help_keyboard()
             )
+
+    elif query.data == "games_menu":
+        games_text = get_games_caption(user_name)
+        try:
+            await query.edit_message_caption(
+                caption=games_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=get_games_keyboard()
+            )
+        except Exception:
+            await query.edit_message_text(
+                text=games_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=get_games_keyboard()
+            )
             
     elif query.data == "start_menu":
-        user_name = query.from_user.first_name
         caption = get_start_caption(user_name)
         try:
             await query.edit_message_caption(
@@ -151,7 +211,8 @@ def main():
 
     # Base Handlers
     application.add_handler(CommandHandler('start', start))
-    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(help_menu|start_menu)$"))
+    application.add_handler(CommandHandler('games', games_cmd))
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(help_menu|start_menu|games_menu)$"))
 
     # Register Admin & Game Handlers
     for handler in admin_handlers:

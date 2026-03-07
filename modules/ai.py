@@ -171,7 +171,7 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     response_text = await generate_ai_response(prompt, user_memory)
     
     # Save to memory (simple summarization/saving for now)
-    memory_update = f"User: {prompt}\nDaisy: {response_text[:50]}..."
+    memory_update = f"User: {prompt}\nDaisy: {response_text}"
     await update_user_memory(user.id, user.username or user.first_name, memory_update)
 
     # Reply using HTML parse mode
