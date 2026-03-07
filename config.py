@@ -1,14 +1,9 @@
-import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file (for local development)
-load_dotenv()
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-AI_API_KEY = os.getenv("AI_API_KEY")
-AI_API_BASE = os.getenv("AI_API_BASE")
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gpt-4o")
-BOT_USERNAME = os.getenv("BOT_USERNAME")
+# Hardcoded Configuration
+BOT_TOKEN = "8633495334:AAH_ytIQiHfpgtThafybSP8kMtIGGAgcQwI"
+AI_API_KEY = "sk-av-v1-noq_Ig2pG6epdhC880sybnd4Sb_j2zs4ZiZUj5tDK05HqhLgy7GcwwGrnyloFufcEuf7_8jMcQRP2RsWIwXBk4Gwmdw2IU5jvKPWRQ58cO7sUlZSsfWBKAj"
+AI_API_BASE = "https://api.gptnix.online/v1"
+AI_MODEL_NAME = "openai/gpt-4o"
+BOT_USERNAME = "daisyslaysbot"
 
 if not BOT_TOKEN:
-    print("WARNING: BOT_TOKEN is not set. Please set it in your environment variables.")
+    print("WARNING: BOT_TOKEN is not set")
