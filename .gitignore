@@ -8,7 +8,7 @@ env.bak/
 venv.bak/
 
 # API keys and config
-config.py
+config.example.py
 
 # Database
 *.db
