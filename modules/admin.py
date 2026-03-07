@@ -343,12 +343,118 @@ async def purge_msgs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handlers List
 handlers = [
-    CommandHandler('ban', ban_user), CommandHandler('unban', unban_user),
-    CommandHandler('mute', mute_user), CommandHandler('unmute', unmute_user),
-    CommandHandler('kick', kick_user), CommandHandler('pin', pin_msg),
+    CommandHandler('ban', cmd_ban), CommandHandler('dban', cmd_dban), CommandHandler('sban', cmd_sban), CommandHandler('tban', cmd_tban), CommandHandler('unban', unban_user),
+    CommandHandler('mute', cmd_mute), CommandHandler('dmute', cmd_dmute), CommandHandler('smute', cmd_smute), CommandHandler('tmute', cmd_tmute), CommandHandler('unmute', unmute_user),
+    CommandHandler('kick', cmd_kick), CommandHandler('dkick', cmd_dkick), CommandHandler('skick', cmd_skick), CommandHandler('kickme', cmd_kickme), CommandHandler('pin', pin_msg),
     CommandHandler('unpin', unpin_msg), CommandHandler('del', del_msg),
     CommandHandler('lock', lock_chat), CommandHandler('unlock', unlock_chat),
     CommandHandler('setadmin', set_admin), CommandHandler('deladmin', del_admin),
     CommandHandler('setgtitle', set_gtitle), CommandHandler('setgdesc', set_gdesc),
     CommandHandler('exportlink', export_link), CommandHandler('purge', purge_msgs)
 ]
+
+
+import time
+from datetime import timedelta
+
+def parse_time(time_str):
+    if not time_str: return None
+    match = re.match(r"(\d+)([mhd|w])", time_str)
+    if not match: return None
+    amount = int(match.group(1))
+    unit = match.group(2)
+    if unit == 'm': return timedelta(minutes=amount)
+    if unit == 'h': return timedelta(hours=amount)
+    if unit == 'd': return timedelta(days=amount)
+    if unit == 'w': return timedelta(weeks=amount)
+    return None
+
+async def resolve_target(update, context):
+    reply = update.message.reply_to_message
+    if reply: return reply.from_user
+    if context.args:
+        # Check entities
+        for ent in update.message.entities:
+            if ent.type == "text_mention": return ent.user
+        
+        target_str = context.args[0]
+        if target_str.isdigit():
+            try:
+                member = await context.bot.get_chat_member(update.effective_chat.id, int(target_str))
+                return member.user
+            except:
+                return None
+    return None
+
+async def advanced_action(update, context, action_type, silent=False, delete_reply=False, is_temp=False):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
+        return
+    if not await check_admin(update, context):
+        await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
+        return
+
+    target_user = await resolve_target(update, context)
+    if not target_user:
+        await update.message.reply_text("<b>Please reply to a user, provide their ID, or mention them.</b>", parse_mode=ParseMode.HTML)
+        return
+
+    until_date = None
+    time_str = None
+    if is_temp:
+        args = context.args
+        for arg in args:
+            t = parse_time(arg)
+            if t:
+                until_date = int(time.time() + t.total_seconds())
+                time_str = arg
+                break
+        if not until_date:
+            await update.message.reply_text("<b>Please specify a valid time (e.g. 4m, 3h, 6d).</b>", parse_mode=ParseMode.HTML)
+            return
+
+    try:
+        if action_type == 'ban':
+            await context.bot.ban_chat_member(update.effective_chat.id, target_user.id, until_date=until_date)
+            action_text = f"Banned" if not is_temp else f"Banned for {time_str}"
+        elif action_type == 'mute':
+            permissions = ChatPermissions(can_send_messages=False)
+            await context.bot.restrict_chat_member(update.effective_chat.id, target_user.id, permissions=permissions, until_date=until_date)
+            action_text = f"Muted" if not is_temp else f"Muted for {time_str}"
+        elif action_type == 'kick':
+            await context.bot.ban_chat_member(update.effective_chat.id, target_user.id)
+            await context.bot.unban_chat_member(update.effective_chat.id, target_user.id)
+            action_text = "Kicked"
+            
+        if delete_reply and update.message.reply_to_message:
+            await update.message.reply_to_message.delete()
+        if silent:
+            await update.message.delete()
+        else:
+            await update.message.reply_text(f"<b>🔨 {action_text} <a href='tg://user?id={target_user.id}'>{target_user.first_name}</a>.</b>", parse_mode=ParseMode.HTML)
+
+    except Exception as e:
+        await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
+
+async def cmd_ban(update, context): await advanced_action(update, context, 'ban')
+async def cmd_dban(update, context): await advanced_action(update, context, 'ban', delete_reply=True)
+async def cmd_sban(update, context): await advanced_action(update, context, 'ban', silent=True)
+async def cmd_tban(update, context): await advanced_action(update, context, 'ban', is_temp=True)
+
+async def cmd_mute(update, context): await advanced_action(update, context, 'mute')
+async def cmd_dmute(update, context): await advanced_action(update, context, 'mute', delete_reply=True)
+async def cmd_smute(update, context): await advanced_action(update, context, 'mute', silent=True)
+async def cmd_tmute(update, context): await advanced_action(update, context, 'mute', is_temp=True)
+
+async def cmd_kick(update, context): await advanced_action(update, context, 'kick')
+async def cmd_dkick(update, context): await advanced_action(update, context, 'kick', delete_reply=True)
+async def cmd_skick(update, context): await advanced_action(update, context, 'kick', silent=True)
+
+async def cmd_kickme(update, context):
+    if update.effective_chat.type == "private": return
+    try:
+        user = update.effective_user
+        await context.bot.ban_chat_member(update.effective_chat.id, user.id)
+        await context.bot.unban_chat_member(update.effective_chat.id, user.id)
+        await update.message.reply_text(f"<b>👢 <a href='tg://user?id={user.id}'>{user.first_name}</a> kicked themselves!</b>", parse_mode=ParseMode.HTML)
+    except: pass

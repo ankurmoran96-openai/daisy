@@ -9,6 +9,7 @@ from database.db import init_db
 from modules.admin import handlers as admin_handlers
 from modules.ai import ai_handler
 from modules.games import handlers as game_handlers
+from modules.welcome import welcome_handler
 
 # Set up logging
 logging.basicConfig(
@@ -61,8 +62,12 @@ def get_help_caption(username):
         f"<i>Hello {username}, here is my complete command list!</i>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
         f"<b>👮‍♂️ Admin Commands</b>\n"
-        f"<code>/ban</code> | <code>/unban</code> | <code>/kick</code> - Manage members\n"
-        f"<code>/mute</code> | <code>/unmute</code> - Manage texting rights\n"
+        f"<code>/ban</code> | <code>/dban</code> | <code>/sban</code> | <code>/tban</code>\n"
+        f"<code>/unban</code>\n"
+        f"<code>/mute</code> | <code>/dmute</code> | <code>/smute</code> | <code>/tmute</code>\n"
+        f"<code>/unmute</code>\n"
+        f"<code>/kick</code> | <code>/dkick</code> | <code>/skick</code>\n"
+        f"<code>/kickme</code> - Kick yourself\n"
         f"<code>/pin</code> | <code>/unpin</code> | <code>/del</code> - Manage messages\n"
         f"<code>/purge [count]</code> - Mass sweep messages\n"
         f"<code>/lock</code> | <code>/unlock</code> - Lockdown chat\n"
@@ -154,10 +159,12 @@ def main():
         
     for handler in game_handlers:
         application.add_handler(handler)
-    
+
+    # Welcome Handler
+    application.add_handler(welcome_handler)
+
     # AI Handler (Must be registered last to not block commands)
     application.add_handler(ai_handler)
-
     # Initialize database
     import asyncio
     loop = asyncio.get_event_loop()
