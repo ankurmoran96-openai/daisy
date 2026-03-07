@@ -16,8 +16,10 @@ def get_play_again_keyboard(game: str, extra: str = ""):
 
 # --- AI Helper for MCQ ---
 async def fetch_mcq_from_ai(subject: str) -> dict:
+    seed = random.randint(1000, 999999)
     prompt = (
-        f"Generate a multiple choice question about {subject}. "
+        f"Generate a unique, challenging multiple choice question about {subject}. "
+        f"Session Seed: {seed}. Ensure this question is different from previous ones. "
         "Return ONLY a valid JSON object with EXACTLY these keys: "
         "'question' (string), 'options' (list of exactly 4 string options), "
         "'answer' (integer 0-3 representing the index of the correct option). "
@@ -263,7 +265,7 @@ async def ttt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     winner = check_ttt_winner(game['board'])
 
     if winner:
-        await finish_ttt(query, game, game_id, winner)
+        await finish_ttt(query, game, game_id, winner, context)
         return
 
     game['turn'] = '⭕️' if game['turn'] == '❌' else '❌'
@@ -275,7 +277,7 @@ async def ttt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             game['board'][ai_pos] = '⭕️'
             winner = check_ttt_winner(game['board'])
             if winner:
-                await finish_ttt(query, game, game_id, winner)
+                await finish_ttt(query, game, game_id, winner, context)
                 return
             game['turn'] = '❌'
 
@@ -285,7 +287,7 @@ async def ttt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_ttt_keyboard(game['board'], game_id), parse_mode=ParseMode.HTML
     )
 
-async def finish_ttt(query, game, game_id, winner):
+async def finish_ttt(query, game, game_id, winner, context):
     if winner == "Draw": text = "It's a Draw! 🤝"
     else:
         w_name = game['player_x_name'] if winner == '❌' else game['player_o_name']
