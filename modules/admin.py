@@ -341,17 +341,7 @@ async def purge_msgs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: pass
 
 
-# Handlers List
-handlers = [
-    CommandHandler('ban', cmd_ban), CommandHandler('dban', cmd_dban), CommandHandler('sban', cmd_sban), CommandHandler('tban', cmd_tban), CommandHandler('unban', unban_user),
-    CommandHandler('mute', cmd_mute), CommandHandler('dmute', cmd_dmute), CommandHandler('smute', cmd_smute), CommandHandler('tmute', cmd_tmute), CommandHandler('unmute', unmute_user),
-    CommandHandler('kick', cmd_kick), CommandHandler('dkick', cmd_dkick), CommandHandler('skick', cmd_skick), CommandHandler('kickme', cmd_kickme), CommandHandler('pin', pin_msg),
-    CommandHandler('unpin', unpin_msg), CommandHandler('del', del_msg),
-    CommandHandler('lock', lock_chat), CommandHandler('unlock', unlock_chat),
-    CommandHandler('setadmin', set_admin), CommandHandler('deladmin', del_admin),
-    CommandHandler('setgtitle', set_gtitle), CommandHandler('setgdesc', set_gdesc),
-    CommandHandler('exportlink', export_link), CommandHandler('purge', purge_msgs)
-]
+
 
 
 import time
@@ -458,3 +448,16 @@ async def cmd_kickme(update, context):
         await context.bot.unban_chat_member(update.effective_chat.id, user.id)
         await update.message.reply_text(f"<b>👢 <a href='tg://user?id={user.id}'>{user.first_name}</a> kicked themselves!</b>", parse_mode=ParseMode.HTML)
     except: pass
+
+
+# Handlers List
+handlers = [
+    CommandHandler('ban', cmd_ban), CommandHandler('dban', cmd_dban), CommandHandler('sban', cmd_sban), CommandHandler('tban', cmd_tban), CommandHandler('unban', unban_user),
+    CommandHandler('mute', cmd_mute), CommandHandler('dmute', cmd_dmute), CommandHandler('smute', cmd_smute), CommandHandler('tmute', cmd_tmute), CommandHandler('unmute', unmute_user),
+    CommandHandler('kick', cmd_kick), CommandHandler('dkick', cmd_dkick), CommandHandler('skick', cmd_skick), CommandHandler('kickme', cmd_kickme), CommandHandler('pin', pin_msg),
+    CommandHandler('unpin', unpin_msg), CommandHandler('del', del_msg),
+    CommandHandler('lock', lock_chat), CommandHandler('unlock', unlock_chat),
+    CommandHandler('setadmin', set_admin), CommandHandler('deladmin', del_admin),
+    CommandHandler('setgtitle', set_gtitle), CommandHandler('setgdesc', set_gdesc),
+    CommandHandler('exportlink', export_link), CommandHandler('purge', purge_msgs)
+]
