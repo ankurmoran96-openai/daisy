@@ -28,31 +28,15 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_admin(update, context):
         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
         return
-    reply = update.message.reply_to_message
-    if not reply:
-        await update.message.reply_text("<b>Reply to a user's message to unban them.</b>", parse_mode=ParseMode.HTML)
+    
+    target_user = await resolve_target(update, context)
+    if not target_user:
+        await update.message.reply_text("<b>Reply to a user's message, mention them, or provide their ID to unban.</b>", parse_mode=ParseMode.HTML)
         return
-    try:
-        await context.bot.unban_chat_member(chat_id=update.effective_chat.id, user_id=reply.from_user.id, only_if_banned=True)
-        await update.message.reply_text(f"<b>✅ Unbanned <a href='tg://user?id={reply.from_user.id}'>{reply.from_user.first_name}</a>.</b>", parse_mode=ParseMode.HTML)
-    except Exception as e:
-         await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
-async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type == "private":
-        await update.message.reply_text("<b>⚠️ These commands are intended to be used in groups!</b>", parse_mode=ParseMode.HTML)
-        return
-    if not await check_admin(update, context):
-         await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
-         return
-    reply = update.message.reply_to_message
-    if not reply:
-        await update.message.reply_text("<b>Reply to a user's message to mute them.</b>", parse_mode=ParseMode.HTML)
-        return
-    permissions = ChatPermissions(can_send_messages=False)
     try:
-        await context.bot.restrict_chat_member(chat_id=update.effective_chat.id, user_id=reply.from_user.id, permissions=permissions)
-        await update.message.reply_text(f"<b>🔇 Muted <a href='tg://user?id={reply.from_user.id}'>{reply.from_user.first_name}</a>.</b>", parse_mode=ParseMode.HTML)
+        await context.bot.unban_chat_member(chat_id=update.effective_chat.id, user_id=target_user.id, only_if_banned=True)
+        await update.message.reply_text(f"<b>✅ Unbanned <a href='tg://user?id={target_user.id}'>{target_user.first_name}</a>.</b>", parse_mode=ParseMode.HTML)
     except Exception as e:
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
@@ -63,10 +47,12 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_admin(update, context):
          await update.message.reply_text("<b>🚫 You lack admin privileges!</b>", parse_mode=ParseMode.HTML)
          return
-    reply = update.message.reply_to_message
-    if not reply:
-        await update.message.reply_text("<b>Reply to a user's message to unmute them.</b>", parse_mode=ParseMode.HTML)
+
+    target_user = await resolve_target(update, context)
+    if not target_user:
+        await update.message.reply_text("<b>Reply to a user's message, mention them, or provide their ID to unmute.</b>", parse_mode=ParseMode.HTML)
         return
+
     permissions = ChatPermissions(
         can_send_messages=True, can_send_audios=True, can_send_documents=True,
         can_send_photos=True, can_send_videos=True, can_send_video_notes=True,
@@ -74,8 +60,8 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         can_add_web_page_previews=True, can_change_info=True, can_invite_users=True, can_pin_messages=True
     )
     try:
-        await context.bot.restrict_chat_member(chat_id=update.effective_chat.id, user_id=reply.from_user.id, permissions=permissions)
-        await update.message.reply_text(f"<b>🔊 Unmuted <a href='tg://user?id={reply.from_user.id}'>{reply.from_user.first_name}</a>.</b>", parse_mode=ParseMode.HTML)
+        await context.bot.restrict_chat_member(chat_id=update.effective_chat.id, user_id=target_user.id, permissions=permissions)
+        await update.message.reply_text(f"<b>🔊 Unmuted <a href='tg://user?id={target_user.id}'>{target_user.first_name}</a>.</b>", parse_mode=ParseMode.HTML)
     except Exception as e:
          await update.message.reply_text(f"<b>⚠️ Error:</b> <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 

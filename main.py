@@ -27,8 +27,7 @@ def get_start_keyboard():
             InlineKeyboardButton("👨‍💻 Dev", url="https://t.me/Ankxrrrr")
         ],
         [
-            InlineKeyboardButton("📚 HELP", callback_data="help_menu"),
-            InlineKeyboardButton("🎮 GAMES", callback_data="games_menu")
+            InlineKeyboardButton("📚 HELP", callback_data="help_menu")
         ],
         [
             InlineKeyboardButton("➕ ADD ME TO GROUP", url=f"https://t.me/{bot_username}?startgroup=true")
@@ -146,6 +145,26 @@ async def games_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_games_keyboard()
         )
 
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Help command handler."""
+    user_name = update.effective_user.first_name
+    caption = get_help_caption(user_name)
+    
+    if os.path.exists(BANNER_PATH):
+        with open(BANNER_PATH, 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=get_help_keyboard()
+            )
+    else:
+        await update.message.reply_text(
+            text=caption,
+            parse_mode=ParseMode.HTML,
+            reply_markup=get_help_keyboard()
+        )
+
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the Help and Back inline buttons."""
     query = update.callback_query
@@ -211,6 +230,7 @@ def main():
 
     # Base Handlers
     application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('help', help_cmd))
     application.add_handler(CommandHandler('games', games_cmd))
     application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(help_menu|start_menu|games_menu)$"))
 
