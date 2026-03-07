@@ -57,7 +57,7 @@ async def fetch_mcq_from_ai(subject: str) -> dict:
 
 # --- Command Entry Points ---
 async def cmd_rps(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'rps')
-async def cmd_tictactoe(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'tictactoe')
+async def cmd_tictactoe(update: Update, context: ContextTypes.DEFAULT_TYPE): await route_game(update, context, 'tictactoe', 'multi', '')
 async def cmd_wordguess(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'wordguess')
 async def cmd_dice(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'dice')
 async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE): await prompt_mode(update, context, 'slots')
@@ -96,9 +96,11 @@ async def route_game(update: Update, context: ContextTypes.DEFAULT_TYPE, game: s
     chat_id = query.message.chat_id if query else update.effective_chat.id
     user = query.from_user if query else update.effective_user
 
+    if game == 'tictactoe':
+        mode = 'multi'
+
     if mode == 'ai':
         if game == 'rps': await start_rps_ai(user, chat_id, context, query)
-        elif game == 'tictactoe': await start_ttt_ai(user, chat_id, context, query)
         elif game == 'wordguess': await start_wordguess(user, chat_id, context, query, ai_mode=True)
         elif game in ['dice', 'slots', 'darts']: await start_casino_ai(user, chat_id, context, game, query)
         elif game == 'mcq': await start_mcq(user, chat_id, context, extra, query)
@@ -301,7 +303,6 @@ async def finish_ttt(query, game, game_id, winner):
         text = f"🎉 {w_name} ({winner}) Wins!"
         
     kb_list = get_ttt_keyboard(game['board'], game_id).inline_keyboard
-    kb_list.append([InlineKeyboardButton("🤖 Play Again (AI)", callback_data=f"gmode_tictactoe_ai_")])
     kb_list.append([InlineKeyboardButton("👥 Play Again (Multi)", callback_data=f"gmode_tictactoe_multi_")])
     
     await query.edit_message_text(
@@ -368,7 +369,7 @@ async def guess_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- MCQ Game ---
 async def start_mcq(user, chat_id, context, subject, query=None):
     if not subject:
-        subject = random.choice(["BIO", "CHEM", "PHYSICS", "AI/ML CODING", "PYTHON", "C++", "C"])
+        subject = random.choice(["Coding", "C++", "Python", "C", "Chemistry", "Physics", "Biology", "General Knowledge"])
 
     if query: await query.edit_message_text(f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
     else: await context.bot.send_message(chat_id, f"Generating {subject} Question via AI...", parse_mode=ParseMode.HTML)
@@ -384,8 +385,6 @@ async def start_mcq(user, chat_id, context, subject, query=None):
             correct_option_id=q_data['answer'],
             is_anonymous=False
         )
-        kb = [[InlineKeyboardButton("🤖 Play Again", callback_data="gmode_mcq_ai_")]]
-        await context.bot.send_message(chat_id, "<blockquote><b>Play another MCQ?</b></blockquote>", reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.HTML)
     except Exception as e:
         await context.bot.send_message(chat_id, "⚠️ Error sending MCQ Poll. Try again.")
 
