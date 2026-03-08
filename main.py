@@ -26,13 +26,21 @@ async def ping_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = os.getenv("GITHUB_TOKEN", "your_github_token_here")
     repo_url = f"https://ankurmoran96-openai:{token}@github.com/ankurmoran96-openai/daisy.git"
     
+    cwd = os.path.dirname(os.path.abspath(__file__))
+    
     try:
-        subprocess.run(["git", "config", "--global", "--add", "safe.directory", "*"], check=False)
-        subprocess.run(["git", "config", "--global", "user.email", "bot@daisy.com"], check=False)
-        subprocess.run(["git", "config", "--global", "user.name", "Daisy Bot"], check=False)
-        subprocess.run(["git", "add", "."], check=True)
-        subprocess.run(["git", "commit", "-m", "Auto-update via /ping command"], check=False)
-        result = subprocess.run(["git", "push", repo_url, "main"], capture_output=True, text=True)
+        subprocess.run(["git", "config", "--global", "--add", "safe.directory", cwd], cwd=cwd, check=False)
+        subprocess.run(["git", "config", "--global", "user.email", "bot@daisy.com"], cwd=cwd, check=False)
+        subprocess.run(["git", "config", "--global", "user.name", "Daisy Bot"], cwd=cwd, check=False)
+        
+        add_res = subprocess.run(["git", "add", "."], cwd=cwd, capture_output=True, text=True)
+        if add_res.returncode != 0:
+            await msg.edit_text(f"⚠️ Error in git add:\n<code>{add_res.stderr}</code>", parse_mode=ParseMode.HTML)
+            return
+
+        subprocess.run(["git", "commit", "-m", "Auto-update via /ping command"], cwd=cwd, check=False)
+        
+        result = subprocess.run(["git", "push", repo_url, "main"], cwd=cwd, capture_output=True, text=True)
         if result.returncode == 0:
             await msg.edit_text("✅ Successfully pushed to GitHub!")
         else:
