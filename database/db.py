@@ -47,8 +47,8 @@ async def update_user_memory(user_id, username, new_context):
             row = await cursor.fetchone()
             
         if row:
-            # Keep a larger history context (approx 8000 chars)
-            updated_context = (row[0] + "\n" + new_context)[-8000:]
+            # Keep a larger history context (approx 40000 chars for long memory)
+            updated_context = (row[0] + "\n" + new_context)[-40000:]
             await db.execute("UPDATE user_memory SET memory_context = ?, interaction_count = interaction_count + 1 WHERE user_id = ?", (updated_context, user_id))
         else:
             await db.execute("INSERT INTO user_memory (user_id, username, interaction_count, memory_context) VALUES (?, ?, 1, ?)", (user_id, username, new_context))

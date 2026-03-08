@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
@@ -18,6 +19,25 @@ logging.basicConfig(
 )
 
 BANNER_PATH = os.path.join(os.path.dirname(__file__), 'banner.jpg')
+
+async def ping_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ping command to push to github."""
+    msg = await update.message.reply_text("🔄 Pushing to GitHub...", parse_mode=ParseMode.HTML)
+    token = os.getenv("GITHUB_TOKEN", "your_github_token_here")
+    repo_url = f"https://ankurmoran96-openai:{token}@github.com/ankurmoran96-openai/daisy.git"
+    
+    try:
+        subprocess.run(["git", "config", "--global", "user.email", "bot@daisy.com"], check=False)
+        subprocess.run(["git", "config", "--global", "user.name", "Daisy Bot"], check=False)
+        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "commit", "-m", "Auto-update via /ping command"], check=False)
+        result = subprocess.run(["git", "push", repo_url, "main"], capture_output=True, text=True)
+        if result.returncode == 0:
+            await msg.edit_text("✅ Successfully pushed to GitHub!")
+        else:
+            await msg.edit_text(f"⚠️ Error pushing to GitHub:\n<code>{result.stderr}</code>", parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await msg.edit_text(f"⚠️ Exception during push: <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 def get_start_keyboard():
     bot_username = BOT_USERNAME or "daisyslaysbot"
@@ -233,6 +253,7 @@ def main():
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('help', help_cmd))
     application.add_handler(CommandHandler('games', games_cmd))
+    application.add_handler(CommandHandler('ping', ping_cmd))
     application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(help_menu|start_menu|games_menu)$"))
 
     # Register Admin & Game Handlers

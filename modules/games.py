@@ -18,12 +18,15 @@ def get_play_again_keyboard(game: str, extra: str = ""):
 async def fetch_mcq_from_ai(subject: str) -> dict:
     seed = random.randint(1000, 999999)
     prompt = (
-        f"Generate a unique, challenging multiple choice question about {subject}. "
-        f"Session Seed: {seed}. Ensure this question is different from previous ones. "
-        "Return ONLY a valid JSON object with EXACTLY these keys: "
-        "'question' (string), 'options' (list of exactly 4 string options), "
-        "'answer' (integer 0-3 representing the index of the correct option). "
-        "Do not use markdown formatting blocks, just raw JSON."
+        f"Generate a unique multiple choice question about {subject} (seed {seed}).\n"
+        "You must output ONLY a raw JSON object without any formatting blocks or markdown.\n"
+        "Required JSON schema:\n"
+        "{\n"
+        "  \"question\": \"Question text here (max 250 chars)\",\n"
+        "  \"options\": [\"Option A\", \"Option B\", \"Option C\", \"Option D\"],\n"
+        "  \"answer\": 2\n"
+        "}\n"
+        "Note: 'answer' is the 0-based index of the correct option. ONLY return this JSON object. Do not include ```json or any other text."
     )
     headers = {"Authorization": f"Bearer {AI_API_KEY}", "Content-Type": "application/json"}
     payload = {
@@ -46,12 +49,20 @@ async def fetch_mcq_from_ai(subject: str) -> dict:
                 if resp.status == 200:
                     data = await resp.json()
                     content = data['choices'][0]['message']['content'].strip()
-                    if content.startswith("```json"):
-                        content = content[7:-3].strip()
-                    elif content.startswith("```"):
-                        content = content[3:-3].strip()
+                    # More robust JSON extraction
+                    if "{" in content:
+                        start = content.find('{')
+                        end = content.rfind('}')
+                        if start != -1 and end != -1:
+                            content = content[start:end+1]
+                    
                     parsed = json.loads(content)
                     if "question" in parsed and "options" in parsed and "answer" in parsed:
+                        # Truncate if AI ignores instructions
+                        parsed['question'] = parsed['question'][:299]
+                        parsed['options'] = [o[:99] for o in parsed['options'][:10]]
+                        if not (0 <= parsed['answer'] < len(parsed['options'])):
+                            parsed['answer'] = 0
                         return parsed
     except Exception as e:
         print(f"Error fetching MCQ: {e}")
@@ -293,7 +304,8 @@ async def finish_ttt(query, game, game_id, winner, context):
         w_name = game['player_x_name'] if winner == '❌' else game['player_o_name']
         text = f"🎉 {w_name} ({winner}) Wins!"
         
-    kb_list = get_ttt_keyboard(game['board'], game_id).inline_keyboard
+    kb_tuple = get_ttt_keyboard(game['board'], game_id).inline_keyboard
+    kb_list = [list(row) for row in kb_tuple]
     kb_list.append([InlineKeyboardButton("👥 Play Again (Multi)", callback_data=f"gmode_tictactoe_multi_")])
     
     await query.edit_message_text(
@@ -391,7 +403,7 @@ async def start_mcq(user, chat_id, context, subject, query=None):
             is_anonymous=False
         )
     except Exception as e:
-        await context.bot.send_message(chat_id, "⚠️ Error sending MCQ Poll. Try again.")
+        await context.bot.send_message(chat_id, f"⚠️ Error sending MCQ Poll: <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
 
 # --- Handlers List ---
 handlers = [
