@@ -27,6 +27,7 @@ async def ping_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     repo_url = f"https://ankurmoran96-openai:{token}@github.com/ankurmoran96-openai/daisy.git"
     
     try:
+        subprocess.run(["git", "config", "--global", "--add", "safe.directory", "*"], check=False)
         subprocess.run(["git", "config", "--global", "user.email", "bot@daisy.com"], check=False)
         subprocess.run(["git", "config", "--global", "user.name", "Daisy Bot"], check=False)
         subprocess.run(["git", "add", "."], check=True)
